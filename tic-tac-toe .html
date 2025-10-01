@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe - Multi Mode</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+    h1 { margin: 20px 0; }
+    #board {
+      display: grid;
+      gap: 8px;
+      justify-content: center;
+      margin: 20px auto;
+      padding: 15px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: bold;
+      border-radius: 12px;
+      background: #f0f0f0;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .cell:hover {
+      background: #e2e8f0;
+      transform: scale(1.05);
+    }
+    .cell.invincible {
+      background: gold;
+      color: black !important;
+      font-weight: 900;
+      box-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+    }
+    .cell.X { color: #2563eb; }
+    .cell.O { color: #16a34a; }
+    .cell.win { background:#ecfeff; box-shadow: inset 0 0 0 3px rgba(6,182,212,0.2); }
+
+    #controls { margin: 20px; }
+    button, select {
+      padding: 10px 18px;
+      margin: 8px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      transition: 0.2s;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+    }
+    button:hover, select:hover {
+      background: #1d4ed8;
+      transform: translateY(-2px);
+    }
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    #status {
+      margin: 15px 0;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+    footer {
+      margin-top: 20px;
+      font-size: 0.9rem;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tic Tac Toe - Multi Mode</h1>
+
+  <div id="controls">
+    <select id="modeSelect">
+      <option value="easy">Easy</option>
+      <option value="hard">Hard (Erase)</option>
+      <option value="extreme">Extreme (Invincible)</option>
+    </select>
+    <button id="eraseBtn" style="display:none;">Use Erase Power</button>
+    <button id="invincibleBtn" style="display:none;">Use Invincible Move</button>
+    <button id="resetBtn">Restart Game</button>
+  </div>
+
+  <div id="board"></div>
+  <h2 id="status">Your turn (X)</h2>
+  <footer>Easy = classic · Hard = Erase once · Extreme = Invincible move</footer>
+
+  <script>
+    let mode = "easy";
+    let boardSize, winLength;
+    let board, currentPlayer, gameOver;
+    let playerEraseUsed, aiEraseUsed, eraseMode;
+    let playerInvincibleUsed, aiInvincibleUsed, invincibleMode;
+
+    const boardDiv = document.getElementById("board");
+    const statusDiv = document.getElementById("status");
+    const eraseBtn = document.getElementById("eraseBtn");
+    const invincibleBtn = document.getElementById("invincibleBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const modeSelect = document.getElementById("modeSelect");
+
+    modeSelect.addEventListener("change", () => {
+      mode = modeSelect.value;
+      initGame();
+    });
+
+    resetBtn.addEventListener("click", () => initGame());
+
+    eraseBtn.addEventListener("click", () => {
+      if (!playerEraseUsed) {
+        eraseMode = true;
+        statusDiv.textContent = "Erase mode: click an O cell to remove it ❌";
+      }
+    });
+
+    invincibleBtn.addEventListener("click", () => {
+      if (!playerInvincibleUsed) {
+        invincibleMode = true;
+        statusDiv.textContent = "Click a cell to place your Invincible X ⚡";
+      }
+    });
+
+    function initGame() {
+      if (mode === "easy") { boardSize = 3; winLength = 3; eraseBtn.style.display="none"; invincibleBtn.style.display="none"; }
+      if (mode === "hard") { boardSize = 4; winLength = 4; eraseBtn.style.display="inline-block"; invincibleBtn.style.display="none"; }
+      if (mode === "extreme") { boardSize = 5; winLength = 5; eraseBtn.style.display="none"; invincibleBtn.style.display="inline-block"; }
+
+      boardDiv.style.gridTemplateColumns = `repeat(${boardSize}, 80px)`;
+      boardDiv.style.gridTemplateRows = `repeat(${boardSize}, 80px)`;
+
+      board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
+      currentPlayer = 'X';
+      gameOver = false;
+
+      playerEraseUsed = false;
+      aiEraseUsed = false;
+      eraseMode = false;
+
+      playerInvincibleUsed = false;
+      aiInvincibleUsed = false;
+      invincibleMode = false;
+
+      eraseBtn.disabled = false;
+      invincibleBtn.disabled = false;
+
+      statusDiv.textContent = "Your turn (X)";
+      renderBoard();
+    }
+
+    function renderBoard() {
+      boardDiv.innerHTML = "";
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          const cell = document.createElement("div");
+          cell.classList.add("cell");
+          cell.style.width = "80px";
+          cell.style.height = "80px";
+
+          if (board[r][c]) {
+            cell.textContent = board[r][c].mark;
+            cell.classList.add(board[r][c].mark);
+            if (board[r][c].invincible) cell.classList.add("invincible");
+          }
+          cell.addEventListener("click", () => handleMove(r, c));
+          boardDiv.appendChild(cell);
+        }
+      }
+    }
+
+    function handleMove(r, c) {
+      if (gameOver) return;
+
+      // Erase mode (Hard)
+      if (eraseMode) {
+        if (board[r][c] && board[r][c].mark === 'O') {
+          board[r][c] = null;
+          eraseMode = false;
+          playerEraseUsed = true;
+          eraseBtn.disabled = true;
+          statusDiv.textContent = "Erased one O! Now play normally.";
+          renderBoard();
+          return;
+        } else {
+          statusDiv.textContent = "Click an O cell to erase!";
+          return;
+        }
+      }
+
+      // Normal play
+      if (board[r][c]) return;
+      board[r][c] = { mark: currentPlayer, invincible: invincibleMode };
+
+      if (invincibleMode && currentPlayer === 'X') {
+        playerInvincibleUsed = true;
+        invincibleMode = false;
+        invincibleBtn.disabled = true;
+      }
+
+      if (checkWin(currentPlayer)) {
+        statusDiv.textContent = `${currentPlayer} wins! 🎉`;
+        gameOver = true;
+      } else if (isFull()) {
+        statusDiv.textContent = "It's a draw!";
+        gameOver = true;
+      } else {
+        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+        statusDiv.textContent = currentPlayer === 'X' ? "Your turn (X)" : "AI's turn (O)";
+        if (currentPlayer === 'O' && !gameOver) setTimeout(aiMove, 500);
+      }
+      renderBoard();
+    }
+
+    function isFull() {
+      return board.every(row => row.every(cell => cell !== null));
+    }
+
+    function checkWin(player) {
+      function checkDirection(r, c, dr, dc) {
+        let count = 0;
+        for (let i = 0; i < winLength; i++) {
+          const nr = r + dr * i, nc = c + dc * i;
+          if (nr >= 0 && nr < boardSize && nc >= 0 && nc < boardSize &&
+              board[nr][nc] && board[nr][nc].mark === player) {
+            count++;
+          } else break;
+        }
+        return count === winLength;
+      }
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          if (checkDirection(r, c, 1, 0) || checkDirection(r, c, 0, 1) ||
+              checkDirection(r, c, 1, 1) || checkDirection(r, c, 1, -1)) return true;
+        }
+      }
+      return false;
+    }
+
+    function aiMove() {
+      if (gameOver) return;
+
+      let move = null;
+
+      if (mode === "easy") {
+        move = randomMove();
+      } 
+      else if (mode === "hard") {
+        // AI may use erase defensively
+        if (!aiEraseUsed) {
+          const threat = findThreat();
+          if (threat) {
+            board[threat.r][threat.c] = null;
+            aiEraseUsed = true;
+            statusDiv.textContent = "AI used Erase!";
+            renderBoard();
+            setTimeout(aiMove, 400);
+            return;
+          }
+        }
+        move = findBestMove('O') || findBestMove('X') || randomMove();
+      } 
+      else if (mode === "extreme") {
+        move = findBestMove('O') || findBestMove('X');
+        if (!move && !board[Math.floor(boardSize/2)][Math.floor(boardSize/2)])
+          move = {r:Math.floor(boardSize/2),c:Math.floor(boardSize/2)};
+        if (!move) move = randomMove();
+      }
+
+      if (move) {
+        board[move.r][move.c] = { mark: 'O', invincible: false };
+      }
+
+      if (checkWin('O')) {
+        statusDiv.textContent = "AI wins! 🤖";
+        gameOver = true;
+      } else if (isFull()) {
+        statusDiv.textContent = "It's a draw!";
+        gameOver = true;
+      } else {
+        currentPlayer = 'X';
+        statusDiv.textContent = "Your turn (X)";
+      }
+      renderBoard();
+    }
+
+    function randomMove() {
+      let options = [];
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          if (!board[r][c]) options.push({ r, c });
+        }
+      }
+      return options.length ? options[Math.floor(Math.random()*options.length)] : null;
+    }
+
+    function findBestMove(player) {
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          if (!board[r][c]) {
+            board[r][c] = { mark: player, invincible: false };
+            if (checkWin(player)) {
+              board[r][c] = null;
+              return { r, c };
+            }
+            board[r][c] = null;
+          }
+        }
+      }
+      return null;
+    }
+
+    function findThreat() {
+      // Return one of player's marks in a winning line to erase
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          if (!board[r][c]) {
+            board[r][c] = { mark: 'X', invincible: false };
+            if (checkWin('X')) {
+              board[r][c] = null;
+              return {r, c};
+            }
+            board[r][c] = null;
+          }
+        }
+      }
+      return null;
+    }
+
+    initGame();
+  </script>
+</body>
+</html>
+
+
